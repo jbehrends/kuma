@@ -35,6 +35,7 @@ func defaultIngressProxyBuilder(rt core_runtime.Runtime, metadataTracker Datapla
 		LookupIP:           rt.LookupIP(),
 		MetadataTracker:    metadataTracker,
 		apiVersion:         apiVersion,
+		zone:               rt.Config().Multizone.Zone.Name,
 	}
 }
 

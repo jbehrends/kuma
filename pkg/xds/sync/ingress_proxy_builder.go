@@ -23,6 +23,7 @@ type IngressProxyBuilder struct {
 	MetadataTracker    DataplaneMetadataTracker
 
 	apiVersion envoy.APIVersion
+	zone       string
 }
 
 func (p *IngressProxyBuilder) build(key core_model.ResourceKey) (*xds.Proxy, error) {
@@ -37,13 +38,37 @@ func (p *IngressProxyBuilder) build(key core_model.ResourceKey) (*xds.Proxy, err
 		return nil, err
 	}
 
+	var zoneEgressList core_mesh.ZoneEgressResourceList
+	if err := p.ReadOnlyResManager.List(ctx, &zoneEgressList); err != nil {
+		return nil, err
+	}
+
+	// We want only our local egress
+	var localZoneEgress *core_mesh.ZoneEgressResource
+	for _, zoneEgress := range zoneEgressList.Items {
+		if zoneEgress.IsLocalEgress(p.zone) {
+			localZoneEgress = zoneEgress
+			break
+		}
+	}
+
 	allMeshDataplanes := &core_mesh.DataplaneResourceList{}
 	if err := p.ReadOnlyResManager.List(ctx, allMeshDataplanes); err != nil {
 		return nil, err
 	}
 	allMeshDataplanes.Items = xds_topology.ResolveAddresses(syncLog, p.LookupIP, allMeshDataplanes.Items)
 
-	routing := p.resolveRouting(zoneIngress, allMeshDataplanes)
+	allMeshExternalServices := &core_mesh.ExternalServiceResourceList{}
+	if err := p.ReadOnlyResManager.List(ctx, allMeshExternalServices); err != nil {
+		return nil, err
+	}
+
+	externalServices := allMeshExternalServices.Items
+	sort.Slice(externalServices, func(a, b int) bool {
+		return externalServices[a].GetMeta().GetName() < externalServices[b].GetMeta().GetName()
+	})
+
+	routing := p.resolveRouting(zoneIngress, localZoneEgress, allMeshDataplanes, allMeshExternalServices)
 
 	zoneIngressProxy, err := p.buildZoneIngressProxy(ctx)
 	if err != nil {
@@ -96,9 +121,13 @@ func (p *IngressProxyBuilder) getZoneIngress(key core_model.ResourceKey) (*core_
 	return zoneIngress, nil
 }
 
-func (p *IngressProxyBuilder) resolveRouting(zoneIngress *core_mesh.ZoneIngressResource, dataplanes *core_mesh.DataplaneResourceList) *xds.Routing {
+func (p *IngressProxyBuilder) resolveRouting(zoneIngress *core_mesh.ZoneIngressResource,
+	zoneEgress *core_mesh.ZoneEgressResource,
+	dataplanes *core_mesh.DataplaneResourceList,
+	externalServices *core_mesh.ExternalServiceResourceList) *xds.Routing {
+
 	destinations := ingress.BuildDestinationMap(zoneIngress)
-	endpoints := ingress.BuildEndpointMap(destinations, dataplanes.Items)
+	endpoints := ingress.BuildEndpointMap(destinations, zoneEgress, dataplanes.Items, externalServices.Items)
 
 	routing := &xds.Routing{
 		OutboundTargets: endpoints,

@@ -164,7 +164,7 @@ var _ = Describe("EgressGenerator", func() {
 			fileWithResourcesName: "01.externalservice-only.yaml",
 			expected:              "01.externalservice-only.golden.yaml",
 		}),
-		Entry("02. default trafficroute, one service behind zoneingress", testCase{
+		FEntry("02. default trafficroute, one service behind zoneingress", testCase{
 			fileWithResourcesName: "02.internalservice-only.yaml",
 			expected:              "02.internalservice-only.golden.yaml",
 		}),
@@ -179,6 +179,10 @@ var _ = Describe("EgressGenerator", func() {
 		Entry("05. custom trafficpermission, mixed internal and external services", testCase{
 			fileWithResourcesName: "05.mixed-services-with-custom-trafficpermissions.yaml",
 			expected:              "05.mixed-services-with-custom-trafficpermissions.golden.yaml",
+		}),
+		Entry("06. zone egress with zone label, mixed internal and external services", testCase{
+			fileWithResourcesName: "06.mixed-services-with-zone-label.yaml",
+			expected:              "06.mixed-services-with-zone-label.golden.yaml",
 		}),
 	)
 })

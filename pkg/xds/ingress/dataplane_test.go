@@ -14,6 +14,7 @@ import (
 	"github.com/kumahq/kuma/pkg/core/resources/model"
 	"github.com/kumahq/kuma/pkg/core/resources/store"
 	model2 "github.com/kumahq/kuma/pkg/test/resources/model"
+	test_model "github.com/kumahq/kuma/pkg/test/resources/model"
 	util_proto "github.com/kumahq/kuma/pkg/util/proto"
 	"github.com/kumahq/kuma/pkg/xds/ingress"
 )
@@ -157,7 +158,7 @@ var _ = Describe("Ingress Dataplane", func() {
 		}),
 	)
 
-	It("should not update store if ingress haven't changed", func() {
+	FIt("should not update store if ingress haven't changed", func() {
 		ctx := context.Background()
 		mgr := &fakeResourceManager{}
 
@@ -166,6 +167,7 @@ var _ = Describe("Ingress Dataplane", func() {
 				Networking: &mesh_proto.ZoneIngress_Networking{
 					Port: 10001,
 				},
+				Zone: "zone1",
 				AvailableServices: []*mesh_proto.ZoneIngress_AvailableService{
 					{
 						Instances: 1,
@@ -185,6 +187,27 @@ var _ = Describe("Ingress Dataplane", func() {
 						},
 						Mesh: "mesh1",
 					},
+				},
+			},
+		}
+
+		externalServices := []*core_mesh.ExternalServiceResource{
+			{
+				Meta: &test_model.ResourceMeta{Mesh: "mesh1"},
+				Spec: &mesh_proto.ExternalService{
+					Networking: &mesh_proto.ExternalService_Networking{
+						Address: "httpbin.org:80",
+					},
+					Tags: map[string]string{mesh_proto.ServiceTag: "httpbin", mesh_proto.ZoneTag: "zone1"},
+				},
+			},
+			{
+				Meta: &test_model.ResourceMeta{Mesh: "mesh1"},
+				Spec: &mesh_proto.ExternalService{
+					Networking: &mesh_proto.ExternalService_Networking{
+						Address: "example.com:443",
+					},
+					Tags: map[string]string{mesh_proto.ServiceTag: "example"},
 				},
 			},
 		}
@@ -239,7 +262,7 @@ var _ = Describe("Ingress Dataplane", func() {
 				},
 			},
 		}
-		err := ingress.UpdateAvailableServices(ctx, mgr, ing, others)
+		err := ingress.UpdateAvailableServices(ctx, mgr, ing, others, externalServices)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(mgr.updCounter).To(Equal(0))
 	})

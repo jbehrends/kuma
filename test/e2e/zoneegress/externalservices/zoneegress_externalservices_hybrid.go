@@ -31,6 +31,7 @@ networking:
   outbound:
     passthrough: %s
 routing:
+  localityAwareLoadBalancing: true
   zoneEgress: %s
 `
 
@@ -88,6 +89,7 @@ networking:
 		zone1 = k8sClusters.GetCluster(Kuma1)
 		Expect(NewClusterSetup().
 			Install(Kuma(config_core.Zone,
+				WithIngress(),
 				WithEgress(true),
 				WithGlobalAddress(globalCP.GetKDSServerAddress()),
 			)).
@@ -111,6 +113,8 @@ networking:
 		Expect(err).ToNot(HaveOccurred())
 		egressTokenZone4, err := globalCP.GenerateZoneEgressToken(Kuma4)
 		Expect(err).ToNot(HaveOccurred())
+		igressTokenZone4, err := globalCP.GenerateZoneIngressToken(Kuma4)
+		Expect(err).ToNot(HaveOccurred())
 		demoClientTokenZone4, err := globalCP.GenerateDpToken(nonDefaultMesh, "zone4-demo-client")
 		Expect(err).ToNot(HaveOccurred())
 
@@ -122,6 +126,7 @@ networking:
 				demoClientTokenZone4,
 				WithTransparentProxy(true),
 			)).
+			Install(IngressUniversal(igressTokenZone4)).
 			Install(EgressUniversal(egressTokenZone4)).
 			Install(
 				func(cluster Cluster) error {
@@ -142,7 +147,7 @@ networking:
 		).To(Succeed())
 	})
 
-	It("k8s should access external service through zoneegress", func() {
+	FIt("k8s should access external service through zoneegress", func() {
 		filter := fmt.Sprintf(
 			"cluster.%s_%s.upstream_rq_total",
 			nonDefaultMesh,

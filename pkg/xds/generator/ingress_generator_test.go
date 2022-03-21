@@ -68,7 +68,7 @@ var _ = Describe("IngressGenerator", func() {
 			// and output matches golden files
 			Expect(actual).To(MatchGoldenYAML(filepath.Join("testdata", "ingress", given.expected)))
 		},
-		Entry("01. default trafficroute, single mesh", testCase{
+		FEntry("01. default trafficroute, single mesh", testCase{
 			dataplane: `
             networking:
               address: 10.0.0.1

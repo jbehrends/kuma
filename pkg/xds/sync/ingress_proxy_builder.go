@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"sort"
 
 	"github.com/kumahq/kuma/pkg/core/dns/lookup"
 	core_mesh "github.com/kumahq/kuma/pkg/core/resources/apis/mesh"
@@ -114,8 +115,18 @@ func (p *IngressProxyBuilder) updateIngress(zoneIngress *core_mesh.ZoneIngressRe
 	}
 	allMeshDataplanes.Items = xds_topology.ResolveAddresses(syncLog, p.LookupIP, allMeshDataplanes.Items)
 
+	allMeshExternalServices := &core_mesh.ExternalServiceResourceList{}
+	if err := p.ReadOnlyResManager.List(ctx, allMeshExternalServices); err != nil {
+		return err
+	}
+
+	externalServices := allMeshExternalServices.Items
+	sort.Slice(externalServices, func(a, b int) bool {
+		return externalServices[a].GetMeta().GetName() < externalServices[b].GetMeta().GetName()
+	})
+
 	// Update Ingress' Available Services
 	// This was placed as an operation of DataplaneWatchdog out of the convenience.
 	// Consider moving to the outside of this component (follow the pattern of updating VIP outbounds)
-	return ingress.UpdateAvailableServices(ctx, p.ResManager, zoneIngress, allMeshDataplanes.Items)
+	return ingress.UpdateAvailableServices(ctx, p.ResManager, zoneIngress, allMeshDataplanes.Items, externalServices)
 }

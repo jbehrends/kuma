@@ -64,7 +64,6 @@ func (*ZoneExternalServicesGenerator) generateEDS(
 
 	for _, serviceName := range services {
 		endpoints := endpointMap[serviceName]
-		log.Info("zone ecternal service buildServices for", "services", services)
 		// There is a case where multiple meshes contain services with
 		// the same names, so we cannot use just "serviceName" as a cluster
 		// name as we would overwrite some clusters with the latest one
@@ -169,7 +168,6 @@ func (*ZoneExternalServicesGenerator) addFilterChains(
 				// endpoints for the service
 				continue
 			}
-			log.Info("Internal service zone for", "zone", zoneIngress.Spec.Zone)
 			if endpoints[0].IsExternalService() && endpoints[0].Tags[mesh_proto.ZoneTag] == zoneIngress.Spec.Zone {
 
 				destinations := destinationsPerService[serviceName]

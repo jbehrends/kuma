@@ -29,7 +29,6 @@ func (g *InternalServicesGenerator) Generate(
 	destinations := buildDestinations(meshResources.TrafficRoutes)
 	services := g.buildServices(endpointMap)
 	meshName := meshResources.Mesh.GetMeta().GetName()
-	log.Info("Internal service buildServices for", "services", services)
 
 	g.addFilterChains(
 		apiVersion,
@@ -66,7 +65,6 @@ func (*InternalServicesGenerator) generateEDS(
 	for _, serviceName := range services {
 
 		endpoints := endpointMap[serviceName]
-		log.Info("generateEDS for", "serviceName", serviceName, "endpoint", endpoints)
 		// There is a case where multiple meshes contain services with
 		// the same names, so we cannot use just "serviceName" as a cluster
 		// name as we would overwrite some clusters with the latest one
@@ -161,7 +159,6 @@ func (*InternalServicesGenerator) addFilterChains(
 			}
 
 			endpoints := endpointMap[serviceName]
-			log.Info("Internal service buildServices for", "serviceName", serviceName, "endpoint", endpoints[0])
 
 			if len(endpoints) == 0 {
 				// There is no need to generate filter chain if there is no

@@ -99,6 +99,7 @@ func (g Generator) Generate(
 		}
 	}
 
+	log.Info("Check resources for egress ", "resources", resources)
 	return resources, nil
 }
 

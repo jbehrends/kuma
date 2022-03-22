@@ -23,7 +23,6 @@ func (g *ExternalServicesGenerator) Generate(
 	meshResources *core_xds.MeshResources,
 ) (*core_xds.ResourceSet, error) {
 	resources := core_xds.NewResourceSet()
-	log.Info("Generate get zone: ", "zone", proxy.ZoneEgressProxy.ZoneEgressResource.Spec.GetZone())
 	apiVersion := proxy.APIVersion
 	endpointMap := meshResources.EndpointMap
 	destinations := buildDestinations(meshResources.TrafficRoutes)
@@ -114,7 +113,6 @@ func (*ExternalServicesGenerator) buildServices(
 	for serviceName, endpoints := range endpointMap {
 		if len(endpoints) > 0 && endpoints[0].IsExternalService() {
 			if endpoints[0].Tags[mesh_proto.ZoneTag] == "" || endpoints[0].Tags[mesh_proto.ZoneTag] == zone {
-				log.Info("buildServices for", "serviceName", serviceName, "endpoint", endpoints[0])
 				services = append(services, serviceName)
 			}
 		}

@@ -53,7 +53,7 @@ name: external-service-2
 tags:
   kuma.io/service: external-service-2
   kuma.io/protocol: http
-  kuma.io/zone: kuma-4-zone
+  kuma.io/zone: kuma-4
 networking:
   address: "%s"
 `
@@ -161,7 +161,7 @@ networking:
 		).To(Succeed())
 	})
 
-	FIt("k8s should access external service through zoneegress", func() {
+	It("k8s should access external service through zoneegress", func() {
 		filter := fmt.Sprintf(
 			"cluster.%s_%s.upstream_rq_total",
 			nonDefaultMesh,

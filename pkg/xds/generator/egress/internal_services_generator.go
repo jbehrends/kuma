@@ -29,6 +29,7 @@ func (g *InternalServicesGenerator) Generate(
 	destinations := buildDestinations(meshResources.TrafficRoutes)
 	services := g.buildServices(endpointMap)
 	meshName := meshResources.Mesh.GetMeta().GetName()
+	log.Info("Internal service buildServices for", "services", services)
 
 	g.addFilterChains(
 		apiVersion,
@@ -160,6 +161,7 @@ func (*InternalServicesGenerator) addFilterChains(
 			}
 
 			endpoints := endpointMap[serviceName]
+			log.Info("Internal service buildServices for", "serviceName", serviceName, "endpoint", endpoints[0])
 
 			if len(endpoints) == 0 {
 				// There is no need to generate filter chain if there is no

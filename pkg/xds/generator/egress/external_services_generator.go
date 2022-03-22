@@ -113,7 +113,7 @@ func (*ExternalServicesGenerator) buildServices(
 
 	for serviceName, endpoints := range endpointMap {
 		if len(endpoints) > 0 && endpoints[0].IsExternalService() {
-			if endpoints[0].Tags[mesh_proto.ZoneTag] == "" {
+			if endpoints[0].Tags[mesh_proto.ZoneTag] == "" || endpoints[0].Tags[mesh_proto.ZoneTag] == zone {
 				services = append(services, serviceName)
 			}
 		}

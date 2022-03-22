@@ -90,7 +90,7 @@ func (g Generator) Generate(
 			if err != nil {
 				return nil, err
 			}
-
+			log.Info("Check resources for egress ", "listener", listener)
 			resources.Add(&core_xds.Resource{
 				Name:     listener.GetName(),
 				Origin:   OriginEgress,
@@ -99,7 +99,6 @@ func (g Generator) Generate(
 		}
 	}
 
-	log.Info("Check resources for egress ", "resources", resources)
 	return resources, nil
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/kumahq/kuma/pkg/core/resources/model"
 	"github.com/kumahq/kuma/pkg/core/resources/store"
 	model2 "github.com/kumahq/kuma/pkg/test/resources/model"
+	test_model "github.com/kumahq/kuma/pkg/test/resources/model"
 	util_proto "github.com/kumahq/kuma/pkg/util/proto"
 	"github.com/kumahq/kuma/pkg/xds/ingress"
 )
@@ -185,10 +186,57 @@ var _ = Describe("Ingress Dataplane", func() {
 						},
 						Mesh: "mesh1",
 					},
+					{
+						Instances: 1,
+						Tags: map[string]string{
+							"service":          "httpbin",
+							"version":          "v1",
+							mesh_proto.ZoneTag: "zone-1",
+						},
+						Mesh: "mesh1",
+					},
+					{
+						Instances: 1,
+						Tags: map[string]string{
+							"service": "example",
+						},
+						Mesh: "mesh1",
+					},
 				},
 			},
 		}
-
+		externalServices := []*core_mesh.ExternalServiceResource{
+			{
+				Meta: &test_model.ResourceMeta{
+					Mesh: "mesh1",
+					Name: "es-1",
+				},
+				Spec: &mesh_proto.ExternalService{
+					Networking: &mesh_proto.ExternalService_Networking{
+						Address: "127.0.0.1",
+					},
+					Tags: map[string]string{
+						"service":          "httpbin",
+						"version":          "v1",
+						mesh_proto.ZoneTag: "zone-1",
+					},
+				},
+			},
+			{
+				Meta: &test_model.ResourceMeta{
+					Mesh: "mesh1",
+					Name: "es-2",
+				},
+				Spec: &mesh_proto.ExternalService{
+					Networking: &mesh_proto.ExternalService_Networking{
+						Address: "127.0.0.1",
+					},
+					Tags: map[string]string{
+						"service": "example",
+					},
+				},
+			},
+		}
 		others := []*core_mesh.DataplaneResource{
 			{
 				Meta: &model2.ResourceMeta{Mesh: "mesh1"},
@@ -239,7 +287,7 @@ var _ = Describe("Ingress Dataplane", func() {
 				},
 			},
 		}
-		err := ingress.UpdateAvailableServices(ctx, mgr, ing, others)
+		err := ingress.UpdateAvailableServices(ctx, mgr, ing, others, externalServices)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(mgr.updCounter).To(Equal(0))
 	})

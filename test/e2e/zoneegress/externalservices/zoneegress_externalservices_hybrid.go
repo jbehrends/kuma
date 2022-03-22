@@ -31,6 +31,7 @@ networking:
   outbound:
     passthrough: %s
 routing:
+  localityAwareLoadBalancing: true
   zoneEgress: %s
 `
 
@@ -52,8 +53,21 @@ name: external-service-2
 tags:
   kuma.io/service: external-service-2
   kuma.io/protocol: http
+  kuma.io/zone: kuma-4-zone
 networking:
   address: "%s"
+`
+
+	externalService3 := `
+type: ExternalService
+mesh: %s
+name: httpbin
+tags:
+  kuma.io/service: httpbin
+  kuma.io/protocol: http
+  kuma.io/zone: kuma-1-zone
+networking:
+  address: httpbin.org:80
 `
 
 	var global, zone1 Cluster
@@ -78,6 +92,8 @@ networking:
 			Install(YamlUniversal(fmt.Sprintf(meshMTLSOn, defaultMesh, "true", "true"))).
 			Install(YamlUniversal(fmt.Sprintf(meshMTLSOn, nonDefaultMesh, "true", "true"))).
 			Install(YamlUniversal(fmt.Sprintf(externalService1, nonDefaultMesh))).
+			Install(YamlUniversal(fmt.Sprintf(externalService2, nonDefaultMesh))).
+			Install(YamlUniversal(fmt.Sprintf(externalService3, nonDefaultMesh))).
 			Setup(global)).To(Succeed())
 
 		E2EDeferCleanup(global.DismissCluster)
@@ -88,6 +104,7 @@ networking:
 		zone1 = k8sClusters.GetCluster(Kuma1)
 		Expect(NewClusterSetup().
 			Install(Kuma(config_core.Zone,
+				WithIngress(),
 				WithEgress(true),
 				WithGlobalAddress(globalCP.GetKDSServerAddress()),
 			)).
@@ -109,6 +126,8 @@ networking:
 		// Universal Cluster 4
 		zone4 = universalClusters.GetCluster(Kuma4).(*UniversalCluster)
 		Expect(err).ToNot(HaveOccurred())
+		ingressTokenZone4, err := globalCP.GenerateZoneIngressToken(Kuma4)
+		Expect(err).ToNot(HaveOccurred())
 		egressTokenZone4, err := globalCP.GenerateZoneEgressToken(Kuma4)
 		Expect(err).ToNot(HaveOccurred())
 		demoClientTokenZone4, err := globalCP.GenerateDpToken(nonDefaultMesh, "zone4-demo-client")
@@ -123,6 +142,7 @@ networking:
 				WithTransparentProxy(true),
 			)).
 			Install(EgressUniversal(egressTokenZone4)).
+			Install(IngressUniversal(ingressTokenZone4)).
 			Install(
 				func(cluster Cluster) error {
 					return cluster.DeployApp(
@@ -142,7 +162,7 @@ networking:
 		).To(Succeed())
 	})
 
-	It("k8s should access external service through zoneegress", func() {
+	FIt("k8s should access external service through zoneegress", func() {
 		filter := fmt.Sprintf(
 			"cluster.%s_%s.upstream_rq_total",
 			nonDefaultMesh,
@@ -168,7 +188,7 @@ networking:
 		}, "30s", "1s").Should(Succeed())
 
 		_, stderr, err := zone1.ExecWithRetries(TestNamespace, clientPod.GetName(), "demo-client",
-			"curl", "--verbose", "--max-time", "3", "--fail", "external-service-1.mesh")
+			"curl", "--verbose", "--max-time", "3", "--fail", "external-service-12.mesh")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(stderr).To(ContainSubstring("HTTP/1.1 200 OK"))
 

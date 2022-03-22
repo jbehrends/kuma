@@ -7,7 +7,12 @@ import (
 	"github.com/kumahq/kuma/pkg/xds/envoy"
 )
 
-func BuildEndpointMap(destinations core_xds.DestinationMap, dataplanes []*core_mesh.DataplaneResource) core_xds.EndpointMap {
+func BuildEndpointMap(
+	destinations core_xds.DestinationMap,
+	dataplanes []*core_mesh.DataplaneResource,
+	externalServices []*core_mesh.ExternalServiceResource,
+	zoneEgress *core_mesh.ZoneEgressResource,
+) core_xds.EndpointMap {
 	if len(destinations) == 0 {
 		return nil
 	}
@@ -32,5 +37,24 @@ func BuildEndpointMap(destinations core_xds.DestinationMap, dataplanes []*core_m
 			})
 		}
 	}
+	for _, es := range externalServices {
+		service := es.Spec.Tags[mesh_proto.ServiceTag]
+		selectors, ok := destinations[service]
+		if !ok {
+			continue
+		}
+		withMesh := envoy.Tags(es.Spec.Tags).WithTags("mesh", es.GetMeta().GetMesh())
+		if !selectors.Matches(withMesh) {
+			continue
+		}
+		iface := zoneEgress.Spec.GetNetworking()
+		outbound[service] = append(outbound[service], core_xds.Endpoint{
+			Target: iface.Address,
+			Port:   iface.Port,
+			Tags:   withMesh,
+			Weight: 1,
+		})
+	}
+	//external service
 	return outbound
 }

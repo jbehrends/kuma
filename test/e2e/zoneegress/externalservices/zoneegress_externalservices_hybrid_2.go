@@ -14,87 +14,84 @@ import (
 	"github.com/kumahq/kuma/test/framework/envoy_admin/stats"
 )
 
-func K8sMultizone() {
+func Hybrid2UniversalGlobal() {
 	const defaultMesh = "default"
 	const nonDefaultMesh = "non-default"
 	meshMTLSOn := `
-apiVersion: kuma.io/v1alpha1
-kind: Mesh
-metadata:
-  name: %s
-spec:
-  mtls:
-    enabledBackend: ca-1
-    backends:
-      - name: ca-1
-        type: builtin
-  networking:
-    outbound:
-      passthrough: %s
-  routing:
-    localityAwareLoadBalancing: true
-    zoneEgress: %s`
+type: Mesh
+name: %s
+mtls:
+  enabledBackend: ca-1
+  backends:
+  - name: ca-1
+    type: builtin
+networking:
+  outbound:
+    passthrough: %s
+routing:
+  localityAwareLoadBalancing: true
+  zoneEgress: %s
+`
 
 	externalService1 := `
-apiVersion: kuma.io/v1alpha1
-kind: ExternalService
+type: ExternalService
 mesh: %s
-metadata:
-  name: external-service-1
-spec:
-  tags:
-    kuma.io/service: external-service-1
-    kuma.io/protocol: http
-  networking:
-    address: es-test-server.default.svc.cluster.local:80
+name: external-service-1
+tags:
+  kuma.io/service: external-service-1
+  kuma.io/protocol: http
+networking:
+  address: es-test-server.default.svc.cluster.local:80
 `
 
 	externalService2 := `
-apiVersion: kuma.io/v1alpha1
-kind: ExternalService
+type: ExternalService
 mesh: %s
-metadata:
-  name: external-service-2
-spec:
-  tags:
-    kuma.io/service: external-service-2
-    kuma.io/protocol: http
-    kuma.io/zone: kuma-3-zone
-  networking:
-    address: example.com:80
+name: external-service-2
+tags:
+  kuma.io/service: external-service-2
+  kuma.io/protocol: http
+  kuma.io/zone: kuma-4
+networking:
+  address: "%s"
 `
 
 	externalService3 := `
-apiVersion: kuma.io/v1alpha1
-kind: ExternalService
+type: ExternalService
 mesh: %s
-metadata:
-  name: httpbin
-spec:
-  tags:
-    kuma.io/service: httpbin
-    kuma.io/protocol: http
-    kuma.io/zone: kuma-2-zone
-  networking:
-    address: httpbin.org:80
+name: httpbin
+tags:
+  kuma.io/service: httpbin
+  kuma.io/protocol: http
+  kuma.io/zone: kuma-1-zone
+networking:
+  address: httpbin.org:80
 `
-	var global, zone1, zone2 Cluster
+
+	var global Cluster
+	var zone1, zone2 *K8sCluster
 
 	BeforeEach(func() {
 		k8sClusters, err := NewK8sClusters(
-			[]string{Kuma1, Kuma2, Kuma3},
+			[]string{Kuma1, Kuma2},
+			Silent)
+		Expect(err).ToNot(HaveOccurred())
+
+		universalClusters, err := NewUniversalClusters(
+			[]string{Kuma5},
 			Silent)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Global
-		global = k8sClusters.GetCluster(Kuma1)
+		global = universalClusters.GetCluster(Kuma5)
 
 		Expect(NewClusterSetup().
 			Install(Kuma(config_core.Global)).
-			Install(YamlK8s(fmt.Sprintf(meshMTLSOn, defaultMesh, "true", "true"))).
-			Install(YamlK8s(fmt.Sprintf(meshMTLSOn, nonDefaultMesh, "true", "true"))).
-			Install(YamlK8s(fmt.Sprintf(externalService1, nonDefaultMesh))).
-			Install(YamlK8s(fmt.Sprintf(externalService3, nonDefaultMesh))).
+			Install(YamlUniversal(fmt.Sprintf(meshMTLSOn, defaultMesh, "true", "true"))).
+			Install(YamlUniversal(fmt.Sprintf(meshMTLSOn, nonDefaultMesh, "true", "true"))).
+			Install(YamlUniversal(fmt.Sprintf(externalService1, nonDefaultMesh))).
+			Install(YamlUniversal(fmt.Sprintf(externalService2, nonDefaultMesh))).
+			Install(YamlUniversal(fmt.Sprintf(externalService3, nonDefaultMesh))).
 			Setup(global)).To(Succeed())
 
 		E2EDeferCleanup(global.DismissCluster)
@@ -102,7 +99,7 @@ spec:
 		globalCP := global.GetKuma()
 
 		// K8s Cluster 1
-		zone1 = k8sClusters.GetCluster(Kuma2)
+		zone1 = k8sClusters.GetCluster(Kuma1).(*K8sCluster)
 		Expect(NewClusterSetup().
 			Install(Kuma(config_core.Zone,
 				WithIngress(),
@@ -124,8 +121,8 @@ spec:
 			Expect(zone1.DismissCluster()).To(Succeed())
 		})
 
-		// Universal Cluster 4
-		zone2 = k8sClusters.GetCluster(Kuma3).(*K8sCluster)
+		// K8s Cluster 2
+		zone2 = k8sClusters.GetCluster(Kuma2).(*K8sCluster)
 		Expect(NewClusterSetup().
 			Install(Kuma(config_core.Zone,
 				WithIngress(),
@@ -147,11 +144,7 @@ spec:
 			Expect(zone2.DismissCluster()).To(Succeed())
 		})
 
-		err = YamlK8s(fmt.Sprintf(externalService2,
-			nonDefaultMesh,
-			"externalservice-http-server.externalservice-namespace.svc.cluster.local", // .svc.cluster.local is needed, otherwise Kubernetes will resolve this to the real IP
-		))(global)
-		Expect(err).ToNot(HaveOccurred())
+		E2EDeferCleanup(zone2.DismissCluster)
 	})
 
 	FIt("k8s should access external service through zoneegress", func() {

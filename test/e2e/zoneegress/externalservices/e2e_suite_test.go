@@ -14,5 +14,5 @@ func TestE2E(t *testing.T) {
 }
 
 var _ = Describe("Test ZoneEgress for External Services in Hybrid Multizone", externalservices.HybridUniversalGlobal)
-var _ = Describe("Test ZoneEgress for External Services in K8s Multizone", externalservices.K8sMultizone)
+var _ = Describe("Test ZoneEgress for External Services in Hybrid2 Multizone", externalservices.Hybrid2UniversalGlobal)
 var _ = Describe("Test ZoneEgress for External Services in Universal Standalone", externalservices.UniversalStandalone)

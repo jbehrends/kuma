@@ -27,7 +27,7 @@ func (g *ZoneExternalServicesGenerator) Generate(
 	apiVersion := proxy.APIVersion
 	endpointMap := meshResources.EndpointMap
 	destinations := buildDestinations(meshResources.TrafficRoutes)
-	services := g.buildServices(endpointMap, proxy.ZoneIngress.Spec.Zone)
+	services := g.buildServices(endpointMap, proxy.ZoneEgressProxy.ZoneEgressResource.Spec.GetZone())
 	meshName := meshResources.Mesh.GetMeta().GetName()
 
 	g.addFilterChains(

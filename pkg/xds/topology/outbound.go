@@ -67,7 +67,7 @@ func BuildRemoteEndpointMap(
 
 		outbound[serviceName] = newEndpoints
 	}
-
+	core.Log.Info("test ssssss outbound 2", "outbound", outbound)
 	return outbound
 }
 

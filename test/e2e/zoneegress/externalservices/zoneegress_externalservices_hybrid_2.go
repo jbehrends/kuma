@@ -51,9 +51,9 @@ name: external-service-2
 tags:
   kuma.io/service: external-service-2
   kuma.io/protocol: http
-  kuma.io/zone: kuma-4
+  kuma.io/zone: kuma-2-zone
 networking:
-  address: "%s"
+  address: example.com:80
 `
 
 	externalService3 := `

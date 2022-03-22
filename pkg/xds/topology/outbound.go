@@ -57,6 +57,7 @@ func BuildRemoteEndpointMap(
 	fillExternalServicesOutboundsLb(outbound, externalServices, mesh, loader, zone)
 
 	for serviceName, endpoints := range outbound {
+		core.Log.Info("test ssssss", "serviceName", serviceName)
 		var newEndpoints []core_xds.Endpoint
 
 		for _, endpoint := range endpoints {

@@ -59,7 +59,7 @@ spec:
   tags:
     kuma.io/service: external-service-2
     kuma.io/protocol: http
-	kuma.io/zone: kuma-3-zone
+    kuma.io/zone: kuma-3-zone
   networking:
     address: example.com:80
 `
@@ -74,7 +74,7 @@ spec:
   tags:
     kuma.io/service: httpbin
     kuma.io/protocol: http
-	kuma.io/zone: kuma-2-zone
+    kuma.io/zone: kuma-2-zone
   networking:
     address: httpbin.org:80
 `

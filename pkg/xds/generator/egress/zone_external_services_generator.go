@@ -64,7 +64,7 @@ func (*ZoneExternalServicesGenerator) generateEDS(
 
 	for _, serviceName := range services {
 		endpoints := endpointMap[serviceName]
-
+		log.Info("buildServices for", "serviceName", serviceName, "endpoint", endpoints)
 		// There is a case where multiple meshes contain services with
 		// the same names, so we cannot use just "serviceName" as a cluster
 		// name as we would overwrite some clusters with the latest one

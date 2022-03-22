@@ -63,8 +63,9 @@ func (*InternalServicesGenerator) generateEDS(
 	var resources []*core_xds.Resource
 
 	for _, serviceName := range services {
-		endpoints := endpointMap[serviceName]
 
+		endpoints := endpointMap[serviceName]
+		log.Info("generateEDS for", "serviceName", serviceName, "endpoint", endpoints)
 		// There is a case where multiple meshes contain services with
 		// the same names, so we cannot use just "serviceName" as a cluster
 		// name as we would overwrite some clusters with the latest one

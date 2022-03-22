@@ -6,11 +6,16 @@ import (
 	core_xds "github.com/kumahq/kuma/pkg/core/xds"
 )
 
-func BuildDestinationMap(ingress *core_mesh.ZoneIngressResource) core_xds.DestinationMap {
+func BuildDestinationMap(ingress *core_mesh.ZoneIngressResource,
+	externalServices *core_mesh.ExternalServiceResourceList) core_xds.DestinationMap {
 	destinations := core_xds.DestinationMap{}
 	for _, ingress := range ingress.Spec.GetAvailableServices() {
 		service := ingress.Tags[mesh_proto.ServiceTag]
 		destinations[service] = destinations[service].Add(mesh_proto.MatchTags(ingress.Tags))
+	}
+	for _, es := range externalServices.Items {
+		service := es.Spec.Tags[mesh_proto.ServiceTag]
+		destinations[service] = destinations[service].Add(mesh_proto.MatchTags(es.Spec.Tags))
 	}
 	return destinations
 }

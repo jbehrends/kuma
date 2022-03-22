@@ -92,7 +92,6 @@ networking:
 			Install(YamlUniversal(fmt.Sprintf(meshMTLSOn, defaultMesh, "true", "true"))).
 			Install(YamlUniversal(fmt.Sprintf(meshMTLSOn, nonDefaultMesh, "true", "true"))).
 			Install(YamlUniversal(fmt.Sprintf(externalService1, nonDefaultMesh))).
-			Install(YamlUniversal(fmt.Sprintf(externalService2, nonDefaultMesh))).
 			Install(YamlUniversal(fmt.Sprintf(externalService3, nonDefaultMesh))).
 			Setup(global)).To(Succeed())
 

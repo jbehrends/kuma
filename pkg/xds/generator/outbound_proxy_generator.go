@@ -200,7 +200,6 @@ func (g OutboundProxyGenerator) generateCDS(ctx xds_context.Context, services en
 
 			clusterName := cluster.Name()
 			clusterTags := []envoy_common.Tags{cluster.Tags()}
-			// external service check
 			if service.HasExternalService() {
 				if ctx.Mesh.Resource.ZoneEgressEnabled() {
 					edsClusterBuilder.

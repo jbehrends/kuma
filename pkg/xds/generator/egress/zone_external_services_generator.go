@@ -130,9 +130,8 @@ func (ZoneExternalServicesGenerator) buildServices(
 
 	for serviceName, endpoints := range endpointMap {
 		if len(endpoints) > 0 &&
-			(endpoints[0].IsExternalService() || endpoints[0].Tags["external"] == "true") &&
-			endpoints[0].Tags[mesh_proto.ZoneTag] != "" &&
-			endpoints[0].Tags[mesh_proto.ZoneTag] != zone {
+			isZoneExternalService(&endpoints[0]) &&
+			isNotSpecificZoneExternalService(&endpoints[0], zone) {
 			services = append(services, serviceName)
 		}
 	}
@@ -169,12 +168,12 @@ func (*ZoneExternalServicesGenerator) addFilterChains(
 				continue
 			}
 
-			if endpoints[0].Tags["external"] != "true" {
-				// There is no need to generate filter chain if there is no
-				// endpoints for the service
+			if isNotExternalService(&endpoints[0]) {
+				// We need to generate filter chain for external services only
 				continue
 			}
-			if (endpoints[0].IsExternalService() || endpoints[0].Tags["external"] == "true") && endpoints[0].Tags[mesh_proto.ZoneTag] == zoneIngress.Spec.Zone {
+
+			if isZoneExternalService(&endpoints[0]) && isSpecificZoneExternalService(&endpoints[0], zoneIngress.Spec.Zone) {
 
 				destinations := destinationsPerService[serviceName]
 				destinations = append(destinations, destinationsPerService[mesh_proto.MatchAllTag]...)

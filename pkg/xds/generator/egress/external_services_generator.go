@@ -22,11 +22,12 @@ func (g *ExternalServicesGenerator) Generate(
 	listenerBuilder *envoy_listeners.ListenerBuilder,
 	meshResources *core_xds.MeshResources,
 ) (*core_xds.ResourceSet, error) {
+	zone := proxy.ZoneEgressProxy.ZoneEgressResource.Spec.GetZone()
 	resources := core_xds.NewResourceSet()
 	apiVersion := proxy.APIVersion
 	endpointMap := meshResources.EndpointMap
 	destinations := buildDestinations(meshResources.TrafficRoutes)
-	services := g.buildServices(endpointMap, proxy.ZoneEgressProxy.ZoneEgressResource.Spec.GetZone())
+	services := g.buildServices(endpointMap, zone)
 
 	g.addFilterChains(
 		apiVersion,
@@ -34,7 +35,7 @@ func (g *ExternalServicesGenerator) Generate(
 		endpointMap,
 		meshResources,
 		listenerBuilder,
-		proxy.ZoneEgressProxy.ZoneEgressResource.Spec.GetZone(),
+		zone,
 	)
 
 	cds, err := g.generateCDS(
@@ -105,7 +106,7 @@ func (*ExternalServicesGenerator) generateCDS(
 	return resources, nil
 }
 
-func (*ExternalServicesGenerator) buildServices(
+func (g *ExternalServicesGenerator) buildServices(
 	endpointMap core_xds.EndpointMap,
 	zone string,
 ) []string {
@@ -113,7 +114,7 @@ func (*ExternalServicesGenerator) buildServices(
 
 	for serviceName, endpoints := range endpointMap {
 		if len(endpoints) > 0 && endpoints[0].IsExternalService() {
-			if endpoints[0].Tags[mesh_proto.ZoneTag] == "" || endpoints[0].Tags[mesh_proto.ZoneTag] == zone {
+			if isSpecificZoneOrAllZonesExternalService(&endpoints[0], zone) {
 				services = append(services, serviceName)
 			}
 		}
@@ -124,7 +125,7 @@ func (*ExternalServicesGenerator) buildServices(
 	return services
 }
 
-func (*ExternalServicesGenerator) addFilterChains(
+func (g *ExternalServicesGenerator) addFilterChains(
 	apiVersion envoy_common.APIVersion,
 	destinationsPerService map[string][]envoy_common.Tags,
 	endpointMap core_xds.EndpointMap,
@@ -148,8 +149,9 @@ func (*ExternalServicesGenerator) addFilterChains(
 			continue
 		}
 
-		if endpoints[0].Tags[mesh_proto.ZoneTag] != "" && endpoints[0].Tags[mesh_proto.ZoneTag] != zone {
-			log.Info("external service is ", "serviceName", serviceName)
+		if isNotSpecificZoneExternalService(&endpoints[0], zone) {
+			// we dont generate zone external service here because
+			// it should be accessed through zone egress of zone were it belongs
 			continue
 		}
 

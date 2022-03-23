@@ -90,7 +90,7 @@ func (g Generator) Generate(
 			if err != nil {
 				return nil, err
 			}
-			log.Info("Check resources for egress ", "listener", listener)
+
 			resources.Add(&core_xds.Resource{
 				Name:     listener.GetName(),
 				Origin:   OriginEgress,
@@ -122,4 +122,24 @@ func buildDestinations(
 	}
 
 	return destinations
+}
+
+func isSpecificZoneExternalService(endpoint *core_xds.Endpoint, zone string) bool {
+	return endpoint.Tags[mesh_proto.ZoneTag] == zone
+}
+
+func isSpecificZoneOrAllZonesExternalService(endpoint *core_xds.Endpoint, zone string) bool {
+	return endpoint.Tags[mesh_proto.ZoneTag] == "" || isSpecificZoneExternalService(endpoint, zone)
+}
+
+func isNotSpecificZoneExternalService(endpoint *core_xds.Endpoint, zone string) bool {
+	return endpoint.Tags[mesh_proto.ZoneTag] != "" && endpoint.Tags[mesh_proto.ZoneTag] != zone
+}
+
+func isZoneExternalService(endpoint *core_xds.Endpoint) bool {
+	return endpoint.IsExternalService() || endpoint.Tags[mesh_proto.ZoneExternalServiceTag] == "true"
+}
+
+func isNotExternalService(endpoint *core_xds.Endpoint) bool {
+	return !endpoint.IsExternalService() && endpoint.Tags[mesh_proto.ZoneExternalServiceTag] != "true"
 }

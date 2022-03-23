@@ -55,6 +55,5 @@ func BuildEndpointMap(
 			Weight: 1,
 		})
 	}
-	//external service
 	return outbound
 }

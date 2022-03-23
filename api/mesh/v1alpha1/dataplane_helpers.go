@@ -29,6 +29,9 @@ const (
 	// External service tag
 	ExternalServiceTag = "kuma.io/external-service-name"
 
+	// Zone external service tag
+	ZoneExternalServiceTag = "kuma.io/zone-external-service"
+
 	// Listener tag is used to select Gateway listeners
 	ListenerTag = "gateways.kuma.io/listener-name"
 

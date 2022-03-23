@@ -171,7 +171,7 @@ func (p *IngressProxyBuilder) getIngressExternalServices(ctx context.Context) (*
 		// look for external services that are only available in my zone and expose them
 		for _, es := range meshExternalServices {
 			if es.Spec.Tags[mesh_proto.ZoneTag] != "" && es.Spec.Tags[mesh_proto.ZoneTag] == p.zone {
-				es.Spec.Tags["external"] = "true"
+				es.Spec.Tags[mesh_proto.ZoneExternalServiceTag] = "true"
 				externalServices = append(externalServices, es)
 			}
 		}

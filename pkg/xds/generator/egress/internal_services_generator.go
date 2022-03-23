@@ -123,13 +123,13 @@ func (*InternalServicesGenerator) generateCDS(
 	return resources, nil
 }
 
-func (InternalServicesGenerator) buildServices(
+func (g *InternalServicesGenerator) buildServices(
 	endpointMap core_xds.EndpointMap,
 ) []string {
 	var services []string
 
 	for serviceName, endpoints := range endpointMap {
-		if len(endpoints) > 0 && !endpoints[0].IsExternalService() && endpoints[0].Tags["external"] != "true" {
+		if len(endpoints) > 0 && isNotExternalService(&endpoints[0]) {
 			services = append(services, serviceName)
 		}
 	}
@@ -139,7 +139,7 @@ func (InternalServicesGenerator) buildServices(
 	return services
 }
 
-func (*InternalServicesGenerator) addFilterChains(
+func (g *InternalServicesGenerator) addFilterChains(
 	apiVersion envoy_common.APIVersion,
 	destinationsPerService map[string][]envoy_common.Tags,
 	endpointMap core_xds.EndpointMap,
@@ -166,7 +166,7 @@ func (*InternalServicesGenerator) addFilterChains(
 				continue
 			}
 
-			if endpoints[0].IsExternalService() || endpoints[0].Tags["external"] == "true" {
+			if isZoneExternalService(&endpoints[0]) {
 				// This generator is for internal services only
 				continue
 			}

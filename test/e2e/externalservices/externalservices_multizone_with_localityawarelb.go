@@ -59,7 +59,7 @@ tags:
   kuma.io/zone: kuma-2-zone
 networking:
   address: %s:%d
-`, mesh)
+`, mesh, address, port)
 }
 
 func externalServiceInZone1(mesh string, address string, port int) string {
@@ -73,7 +73,7 @@ tags:
   kuma.io/zone: kuma-1-zone
 networking:
   address: %s:%d
-`, mesh)
+`, mesh, address, port)
 }
 
 var global Cluster
@@ -109,7 +109,7 @@ var _ = E2EBeforeSuite(func() {
 	zone1 = k8sClusters.GetCluster(Kuma1).(*K8sCluster)
 	Expect(NewClusterSetup().
 		Install(Kuma(config_core.Zone,
-			WithIngress(),
+			WithIngress(true),
 			WithEgress(true),
 			WithGlobalAddress(globalCP.GetKDSServerAddress()),
 		)).
@@ -137,7 +137,7 @@ var _ = E2EBeforeSuite(func() {
 	zone2 = k8sClusters.GetCluster(Kuma2).(*K8sCluster)
 	Expect(NewClusterSetup().
 		Install(Kuma(config_core.Zone,
-			WithIngress(),
+			WithIngress(true),
 			WithEgress(true),
 			WithGlobalAddress(globalCP.GetKDSServerAddress()),
 		)).
@@ -162,28 +162,30 @@ var _ = E2EBeforeSuite(func() {
 
 func ExternalServicesOnMultizoneWithLocalityAwareLb() {
 
-	It("should route to external-service through other zone", func() {
-		filter := fmt.Sprintf(
+	FIt("should route to external-service through other zone", func() {
+		filterEgress := fmt.Sprintf(
 			"cluster.%s_%s.upstream_rq_total",
 			defaultMesh,
-			"external-service-1",
+			"external-service-in-zone2",
 		)
+
+		filterIngress := "cluster.external-service-in-zone2.upstream_rq_total"
 
 		// no request on path
 		Eventually(func(g Gomega) {
-			stat, err := zone1.GetZoneEgressEnvoyTunnel().GetStats(filter)
+			stat, err := zone1.GetZoneEgressEnvoyTunnel().GetStats(filterEgress)
 			g.Expect(err).ToNot(HaveOccurred())
 			g.Expect(stat).To(stats.BeEqualZero())
 		}, "15s", "1s").Should(Succeed())
 
 		Eventually(func(g Gomega) {
-			stat, err := zone2.GetZoneEgressEnvoyTunnel().GetStats(filter)
+			stat, err := zone2.GetZoneEgressEnvoyTunnel().GetStats(filterEgress)
 			g.Expect(err).ToNot(HaveOccurred())
 			g.Expect(stat).To(stats.BeEqualZero())
 		}, "15s", "1s").Should(Succeed())
 
 		Eventually(func(g Gomega) {
-			stat, err := zone2.GetZoneIngressEnvoyTunnel().GetStats(filter)
+			stat, err := zone2.GetZoneIngressEnvoyTunnel().GetStats(filterIngress)
 			g.Expect(err).ToNot(HaveOccurred())
 			g.Expect(stat).To(stats.BeEqualZero())
 		}, "15s", "1s").Should(Succeed())
@@ -209,19 +211,19 @@ func ExternalServicesOnMultizoneWithLocalityAwareLb() {
 		// then should route:
 		// app -> zone egress (zone1) -> zone ingress (zone2) -> zone egress (zone2) -> external service
 		Eventually(func(g Gomega) {
-			stat, err := zone1.GetZoneEgressEnvoyTunnel().GetStats(filter)
+			stat, err := zone1.GetZoneEgressEnvoyTunnel().GetStats(filterEgress)
 			g.Expect(err).ToNot(HaveOccurred())
 			g.Expect(stat).To(stats.BeGreaterThanZero())
 		}, "15s", "1s").Should(Succeed())
 
 		Eventually(func(g Gomega) {
-			stat, err := zone2.GetZoneEgressEnvoyTunnel().GetStats(filter)
+			stat, err := zone2.GetZoneEgressEnvoyTunnel().GetStats(filterEgress)
 			g.Expect(err).ToNot(HaveOccurred())
 			g.Expect(stat).To(stats.BeGreaterThanZero())
 		}, "15s", "1s").Should(Succeed())
 
 		Eventually(func(g Gomega) {
-			stat, err := zone2.GetZoneIngressEnvoyTunnel().GetStats(filter)
+			stat, err := zone2.GetZoneIngressEnvoyTunnel().GetStats(filterIngress)
 			g.Expect(err).ToNot(HaveOccurred())
 			g.Expect(stat).To(stats.BeGreaterThanZero())
 		}, "15s", "1s").Should(Succeed())

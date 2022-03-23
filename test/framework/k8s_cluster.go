@@ -84,6 +84,23 @@ func (c *K8sCluster) addEgressEnvoyTunnel() error {
 	return nil
 }
 
+func (c *K8sCluster) addIngressEnvoyTunnel() error {
+	t, err := tunnel.NewK8sEnvoyAdminTunnel(
+		c.t,
+		c.GetKubectlOptions(Config.KumaNamespace),
+		k8s.ResourceTypeService,
+		Config.ZoneIngressApp,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	c.envoyTunnels[Config.ZoneIngressApp] = t
+
+	return nil
+}
+
 func (c *K8sCluster) GetZoneEgressEnvoyTunnel() envoy_admin.Tunnel {
 	t, err := c.GetZoneEgressEnvoyTunnelE()
 	if err != nil {
@@ -494,6 +511,16 @@ func (c *K8sCluster) DeployKuma(mode core.CpMode, opt ...KumaDeploymentOption) e
 		}
 
 		if err := c.addEgressEnvoyTunnel(); err != nil {
+			return err
+		}
+	}
+
+	if c.opts.zoneIngressEnvoyAdminTunnel {
+		if !c.opts.zoneIngress {
+			return errors.New("cannot create tunnel to zone ingress' envoy admin without ingress")
+		}
+
+		if err := c.addIngressEnvoyTunnel(); err != nil {
 			return err
 		}
 	}

@@ -106,7 +106,7 @@ func (*ExternalServicesGenerator) generateCDS(
 	return resources, nil
 }
 
-func (g *ExternalServicesGenerator) buildServices(
+func (*ExternalServicesGenerator) buildServices(
 	endpointMap core_xds.EndpointMap,
 	zone string,
 ) []string {
@@ -125,7 +125,7 @@ func (g *ExternalServicesGenerator) buildServices(
 	return services
 }
 
-func (g *ExternalServicesGenerator) addFilterChains(
+func (*ExternalServicesGenerator) addFilterChains(
 	apiVersion envoy_common.APIVersion,
 	destinationsPerService map[string][]envoy_common.Tags,
 	endpointMap core_xds.EndpointMap,

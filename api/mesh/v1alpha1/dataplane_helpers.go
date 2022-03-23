@@ -27,6 +27,8 @@ const (
 	InstanceTag = "kuma.io/instance"
 
 	// External service tag
+	// If present means that ingress expose external service that
+	// is reachable from this zone
 	ExternalServiceTag = "kuma.io/external-service-name"
 
 	// Zone external service tag

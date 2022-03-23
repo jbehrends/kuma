@@ -122,7 +122,7 @@ func (*ZoneExternalServicesGenerator) generateCDS(
 	return resources, nil
 }
 
-func (ZoneExternalServicesGenerator) buildServices(
+func (*ZoneExternalServicesGenerator) buildServices(
 	endpointMap core_xds.EndpointMap,
 	zone string,
 ) []string {

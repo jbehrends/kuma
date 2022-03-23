@@ -123,7 +123,7 @@ func (*InternalServicesGenerator) generateCDS(
 	return resources, nil
 }
 
-func (g *InternalServicesGenerator) buildServices(
+func (*InternalServicesGenerator) buildServices(
 	endpointMap core_xds.EndpointMap,
 ) []string {
 	var services []string
@@ -139,7 +139,7 @@ func (g *InternalServicesGenerator) buildServices(
 	return services
 }
 
-func (g *InternalServicesGenerator) addFilterChains(
+func (*InternalServicesGenerator) addFilterChains(
 	apiVersion envoy_common.APIVersion,
 	destinationsPerService map[string][]envoy_common.Tags,
 	endpointMap core_xds.EndpointMap,

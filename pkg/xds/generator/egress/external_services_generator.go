@@ -34,6 +34,7 @@ func (g *ExternalServicesGenerator) Generate(
 		endpointMap,
 		meshResources,
 		listenerBuilder,
+		proxy.ZoneEgressProxy.ZoneEgressResource.Spec.GetZone(),
 	)
 
 	cds, err := g.generateCDS(
@@ -129,6 +130,7 @@ func (*ExternalServicesGenerator) addFilterChains(
 	endpointMap core_xds.EndpointMap,
 	meshResources *core_xds.MeshResources,
 	listenerBuilder *envoy_listeners.ListenerBuilder,
+	zone string,
 ) {
 	meshName := meshResources.Mesh.GetMeta().GetName()
 
@@ -143,6 +145,11 @@ func (*ExternalServicesGenerator) addFilterChains(
 			log.Info("no endpoints for service", "serviceName", serviceName)
 			// There is no need to generate filter chain if there is no
 			// endpoints for the service
+			continue
+		}
+
+		if endpoints[0].Tags[mesh_proto.ZoneTag] != "" && endpoints[0].Tags[mesh_proto.ZoneTag] != zone {
+			log.Info("external service is ", "serviceName", serviceName)
 			continue
 		}
 

@@ -129,7 +129,7 @@ func (InternalServicesGenerator) buildServices(
 	var services []string
 
 	for serviceName, endpoints := range endpointMap {
-		if len(endpoints) > 0 && !endpoints[0].IsExternalService() {
+		if len(endpoints) > 0 && !endpoints[0].IsExternalService() && endpoints[0].Tags["external"] != "true" {
 			services = append(services, serviceName)
 		}
 	}
@@ -166,7 +166,7 @@ func (*InternalServicesGenerator) addFilterChains(
 				continue
 			}
 
-			if endpoints[0].IsExternalService() {
+			if endpoints[0].IsExternalService() || endpoints[0].Tags["external"] == "true" {
 				// This generator is for internal services only
 				continue
 			}

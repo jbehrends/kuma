@@ -232,6 +232,10 @@ func fillIngressOutbounds(
 						Locality: locality,
 					}
 
+					if serviceTags["external"] == "true" {
+						endpoint.ExternalService = &core_xds.ExternalService{}
+					}
+
 					outbound[serviceName] = append(outbound[serviceName], endpoint)
 				}
 			} else {

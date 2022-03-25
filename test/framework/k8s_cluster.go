@@ -638,23 +638,13 @@ func (c *K8sCluster) StartZoneIngress() error {
 	if err := k8s.RunKubectlE(c.GetTesting(), c.GetKubectlOptions(Config.KumaNamespace), "scale", "--replicas=1", fmt.Sprintf("deployment/%s", Config.ZoneIngressApp)); err != nil {
 		return err
 	}
-	_, err := retry.DoWithRetryE(c.t,
-		"wait for zone ingress to be up",
-		c.defaultRetries,
-		c.defaultTimeout,
-		func() (string, error) {
-			pods := c.getPods(Config.KumaNamespace, Config.ZoneIngressApp)
-			if len(pods) == 0 {
-				return "Done", nil
-			}
-			names := []string{}
-			for _, p := range pods {
-				names = append(names, p.Name)
-			}
-			return "", fmt.Errorf("some pods are still present count: '%s'", strings.Join(names, ","))
-		},
-	)
-	return err
+	if err := c.WaitApp(Config.ZoneIngressApp, Config.KumaNamespace, 1); err != nil {
+		return err
+	}
+	if err := c.addIngressEnvoyTunnel(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // StopZoneIngress scales the replicas of a zone ingress to 0 and wait for it to complete. Useful for testing behavior when traffic goes through ingress but there is no instance.
@@ -686,23 +676,13 @@ func (c *K8sCluster) StartZoneEgress() error {
 	if err := k8s.RunKubectlE(c.GetTesting(), c.GetKubectlOptions(Config.KumaNamespace), "scale", "--replicas=1", fmt.Sprintf("deployment/%s", Config.ZoneEgressApp)); err != nil {
 		return err
 	}
-	_, err := retry.DoWithRetryE(c.t,
-		"wait for zone egress to be up",
-		c.defaultRetries,
-		c.defaultTimeout,
-		func() (string, error) {
-			pods := c.getPods(Config.KumaNamespace, Config.ZoneEgressApp)
-			if len(pods) == 0 {
-				return "Done", nil
-			}
-			names := []string{}
-			for _, p := range pods {
-				names = append(names, p.Name)
-			}
-			return "", fmt.Errorf("some pods are still present count: '%s'", strings.Join(names, ","))
-		},
-	)
-	return err
+	if err := c.WaitApp(Config.ZoneEgressApp, Config.KumaNamespace, 1); err != nil {
+		return err
+	}
+	if err := c.addEgressEnvoyTunnel(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // StopZoneEgress scales the replicas of a zone egress to 0 and wait for it to complete. Useful for testing behavior when traffic goes through egress but there is no instance.

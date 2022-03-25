@@ -9,7 +9,6 @@ import (
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	config_core "github.com/kumahq/kuma/pkg/config/core"
 	. "github.com/kumahq/kuma/test/framework"
-	"github.com/kumahq/kuma/test/framework/deployments/testserver"
 	"github.com/kumahq/kuma/test/framework/envoy_admin/stats"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -95,8 +94,6 @@ var _ = E2EBeforeSuite(func() {
 	Expect(NewClusterSetup().
 		Install(Kuma(config_core.Global)).
 		Install(YamlUniversal(meshMTLSOn(defaultMesh, "true", "true"))).
-		Install(YamlUniversal(externalServiceInBothZones(defaultMesh, "external-service-in-both-zones.svc.cluster.local", 80))).
-		Install(YamlUniversal(externalServiceInZone1(defaultMesh, "external-service-in-zone1.default.svc.cluster.local", 80))).
 		Setup(global)).To(Succeed())
 
 	E2EDeferCleanup(global.DismissCluster)
@@ -113,16 +110,6 @@ var _ = E2EBeforeSuite(func() {
 		)).
 		Install(NamespaceWithSidecarInjection(TestNamespace)).
 		Install(DemoClientK8s(defaultMesh)).
-		Install(testserver.Install(
-			testserver.WithName("external-service-in-zone1"),
-			testserver.WithNamespace("default"),
-			testserver.WithArgs("echo", "--instance", "external-service-in-zone1"),
-		)).
-		Install(testserver.Install(
-			testserver.WithName("external-service-in-both-zones"),
-			testserver.WithNamespace("default"),
-			testserver.WithArgs("echo", "--instance", "external-service-in-both-zones"),
-		)).
 		Setup(zone1)).To(Succeed())
 
 	E2EDeferCleanup(func() {
@@ -159,19 +146,52 @@ var _ = E2EBeforeSuite(func() {
 					WithoutDataplane(),
 					WithVerbose())
 			}).
+		Install(
+			func(cluster Cluster) error {
+				return cluster.DeployApp(
+					WithArgs([]string{"test-server", "echo", "--port", "8081", "--instance", "external-service-in-zone1"}),
+					WithName("external-service-in-zone1"),
+					WithoutDataplane(),
+					WithVerbose())
+			}).
+		Install(
+			func(cluster Cluster) error {
+				return cluster.DeployApp(
+					WithArgs([]string{"test-server", "echo", "--port", "8082", "--instance", "external-service-in-both-zones"}),
+					WithName("external-service-in-both-zones"),
+					WithoutDataplane(),
+					WithVerbose())
+			}).
 		Setup(zone4),
 	).To(Succeed())
-
 	E2EDeferCleanup(zone4.DismissCluster)
 
 	Expect(global.GetKumactlOptions().
 		KumactlApplyFromString(externalServiceInZone4(defaultMesh, zone4.GetApp("external-service-in-zone4").GetIP(), 8080)),
 	).To(Succeed())
+	Expect(global.GetKumactlOptions().
+		KumactlApplyFromString(externalServiceInZone1(defaultMesh, zone4.GetApp("external-service-in-zone1").GetIP(), 8081)),
+	).To(Succeed())
+	Expect(global.GetKumactlOptions().
+		KumactlApplyFromString(externalServiceInBothZones(defaultMesh, zone4.GetApp("external-service-in-both-zones").GetIP(), 8082)),
+	).To(Succeed())
 })
 
 func ExternalServicesOnMultizoneHybridWithLocalityAwareLb() {
 
-	JustBeforeEach(func() {
+	BeforeEach(func() {
+		Expect(global.GetKumactlOptions().
+			KumactlApplyFromString(meshMTLSOn(defaultMesh, "true", "true")),
+		).To(Succeed())
+
+		k8sCluster := zone1.(*K8sCluster)
+
+		err := k8sCluster.StartZoneEgress()
+		Expect(err).ToNot(HaveOccurred())
+
+		err = k8sCluster.StartZoneIngress()
+		Expect(err).ToNot(HaveOccurred())
+
 		Eventually(func(g Gomega) {
 			g.Expect(zone1.GetZoneEgressEnvoyTunnel().ResetCounters()).To(Succeed())
 		}, "15s", "1s").Should(Succeed())
@@ -386,5 +406,58 @@ func ExternalServicesOnMultizoneHybridWithLocalityAwareLb() {
 		_, _, err := zone4.ExecWithRetries("", "", "zone4-demo-client",
 			"curl", "--verbose", "--max-time", "3", "--fail", "external-service-in-zone1.mesh")
 		Expect(err).Should(HaveOccurred())
+	})
+
+	It("requests should be routed through local zone egress when locality aware load balancing is disabled", func() {
+		// given locality aware load balancing turned off
+		Expect(global.GetKumactlOptions().
+			KumactlApplyFromString(meshMTLSOn(defaultMesh, "false", "true")),
+		).To(Succeed())
+
+		filterEgress := fmt.Sprintf(
+			"cluster.%s_%s.upstream_rq_total",
+			defaultMesh,
+			"external-service-in-zone1",
+		)
+		filterIngress := "cluster.external-service-in-zone1.upstream_rq_total"
+
+		// and no request on path through ingress
+		Eventually(func(g Gomega) {
+			stat, err := zone4.GetZoneEgressEnvoyTunnel().GetStats(filterEgress)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(stat).To(stats.BeEqualZero())
+		}, "15s", "1s").Should(Succeed())
+
+		Eventually(func(g Gomega) {
+			stat, err := zone1.GetZoneIngressEnvoyTunnel().GetStats(filterIngress)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(stat).To(stats.BeEqualZero())
+		}, "15s", "1s").ShouldNot(Succeed())
+
+		Eventually(func(g Gomega) {
+			stat, err := zone1.GetZoneEgressEnvoyTunnel().GetStats(filterEgress)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(stat).To(stats.BeEqualZero())
+		}, "15s", "1s").Should(Succeed())
+
+		// when doing requests to external service with tag zone1
+		stdout, _, err := zone4.ExecWithRetries("", "", "zone4-demo-client",
+			"curl", "--verbose", "--max-time", "3", "--fail", "external-service-in-zone1.mesh")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(stdout).To(ContainSubstring("HTTP/1.1 200 OK"))
+
+		// then should route:
+		// app -> zone egress (zone4) -> external service
+		Eventually(func(g Gomega) {
+			stat, err := zone4.GetZoneEgressEnvoyTunnel().GetStats(filterEgress)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(stat).To(stats.BeGreaterThanZero())
+		}, "15s", "1s").Should(Succeed())
+
+		Eventually(func(g Gomega) {
+			stat, err := zone1.GetZoneEgressEnvoyTunnel().GetStats(filterEgress)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(stat).To(stats.BeEqualZero())
+		}, "15s", "1s").Should(Succeed())
 	})
 }

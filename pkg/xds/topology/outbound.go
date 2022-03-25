@@ -35,7 +35,7 @@ func BuildEndpointMap(
 	outbound := BuildEdsEndpointMap(mesh, zone, dataplanes, zoneIngresses, zoneEgresses, externalServices)
 
 	if !mesh.ZoneEgressEnabled() {
-		fillExternalServicesOutbounds(outbound, externalServices, mesh, loader, zone, true)
+		fillExternalServicesOutbounds(outbound, externalServices, mesh, loader, zone)
 	}
 
 	return outbound
@@ -54,7 +54,7 @@ func BuildRemoteEndpointMap(
 	outbound := core_xds.EndpointMap{}
 
 	fillIngressOutbounds(outbound, zoneIngresses, nil, zone, mesh)
-	fillExternalServicesOutbounds(outbound, externalServices, mesh, loader, zone, false)
+	fillExternalServicesOutbounds(outbound, externalServices, mesh, loader, zone)
 
 	for serviceName, endpoints := range outbound {
 		var newEndpoints []core_xds.Endpoint
@@ -66,7 +66,7 @@ func BuildRemoteEndpointMap(
 
 		outbound[serviceName] = newEndpoints
 	}
-	core.Log.Info("generated outbound for Remote", "outbound", outbound)
+
 	return outbound
 }
 
@@ -232,7 +232,7 @@ func fillIngressOutbounds(
 						Locality: locality,
 					}
 
-					if serviceTags[mesh_proto.ZoneExternalServiceTag] == "true" {
+					if mesh.Spec.GetRouting().LocalityAwareLoadBalancing && serviceTags[mesh_proto.ZoneExternalServiceTag] == "true" {
 						endpoint.ExternalService = &core_xds.ExternalService{}
 					}
 
@@ -261,21 +261,32 @@ func fillExternalServicesOutbounds(
 	mesh *core_mesh.MeshResource,
 	loader datasource.Loader,
 	zone string,
-	shouldGenerateForAllExternalServices bool,
 ) {
 	for _, externalService := range externalServices {
-		if shouldGenerateForAllExternalServices ||
-			(externalService.Spec.Tags[mesh_proto.ZoneTag] == "" || externalService.Spec.Tags[mesh_proto.ZoneTag] == zone) {
-			service := externalService.Spec.GetService()
-
-			externalServiceEndpoint, err := NewExternalServiceEndpoint(externalService, mesh, loader, zone)
-			if err != nil {
-				core.Log.Error(err, "unable to create ExternalService endpoint. Endpoint won't be included in the XDS.", "name", externalService.Meta.GetName(), "mesh", externalService.Meta.GetMesh())
-				continue
-			}
-			outbound[service] = append(outbound[service], *externalServiceEndpoint)
+		if !mesh.Spec.GetRouting().GetLocalityAwareLoadBalancing() || !mesh.Spec.GetRouting().GetZoneEgress() {
+			createExternalServiceEndpoint(outbound, externalService, mesh, loader, zone)
+		} else if isZoneExternalService(mesh, externalService, zone) {
+			createExternalServiceEndpoint(outbound, externalService, mesh, loader, zone)
+		} else {
+			continue
 		}
 	}
+}
+
+func createExternalServiceEndpoint(
+	outbound core_xds.EndpointMap,
+	externalService *core_mesh.ExternalServiceResource,
+	mesh *core_mesh.MeshResource,
+	loader datasource.Loader,
+	zone string,
+) {
+	service := externalService.Spec.GetService()
+	externalServiceEndpoint, err := NewExternalServiceEndpoint(externalService, mesh, loader, zone)
+	if err != nil {
+		core.Log.Error(err, "unable to create ExternalService endpoint. Endpoint won't be included in the XDS.", "name", externalService.Meta.GetName(), "mesh", externalService.Meta.GetMesh())
+		return
+	}
+	outbound[service] = append(outbound[service], *externalServiceEndpoint)
 }
 
 func fillExternalServicesOutboundsThroughEgress(
@@ -389,4 +400,13 @@ func localityFromTags(mesh *core_mesh.MeshResource, priority uint32, tags map[st
 		Zone:     zone,
 		Priority: priority,
 	}
+}
+
+func isZoneExternalService(
+	mesh *core_mesh.MeshResource,
+	externalService *core_mesh.ExternalServiceResource,
+	zone string,
+) bool {
+	return mesh.LocalityAwareLbEnabled() && mesh.ZoneEgressEnabled() &&
+		(externalService.Spec.Tags[mesh_proto.ZoneTag] == "" || externalService.Spec.Tags[mesh_proto.ZoneTag] == zone)
 }

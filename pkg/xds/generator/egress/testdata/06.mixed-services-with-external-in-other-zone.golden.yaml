@@ -107,6 +107,7 @@ resources:
               mesh: mesh-1
       locality:
         zone: zone-2
+      priority: 1
 - name: mesh-1:service-1-zone-2
   resource:
     '@type': type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment

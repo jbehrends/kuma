@@ -1,4 +1,4 @@
-package externalservices
+package k8s
 
 import (
 	"fmt"
@@ -9,7 +9,6 @@ import (
 
 	config_core "github.com/kumahq/kuma/pkg/config/core"
 	. "github.com/kumahq/kuma/test/framework"
-	"github.com/kumahq/kuma/test/framework/deployments/externalservice"
 	"github.com/kumahq/kuma/test/framework/deployments/testserver"
 	"github.com/kumahq/kuma/test/framework/envoy_admin/stats"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,17 +34,17 @@ routing:
 `, mesh, localityLb, zoneEgress)
 }
 
-func externalServiceInBothZones(mesh string) string {
+func externalServiceInBothZones(mesh string, address string, port int) string {
 	return fmt.Sprintf(`
 type: ExternalService
 mesh: %s
-name: external-service-in-both
+name: external-service-in-both-zones
 tags:
-  kuma.io/service: external-service-in-both
+  kuma.io/service: external-service-in-both-zones
   kuma.io/protocol: http
 networking:
-  address: es-test-server.default.svc.cluster.local:80
-`, mesh)
+  address: %s:%d
+`, mesh, address, port)
 }
 
 func externalServiceInZone2(mesh string, address string, port int) string {
@@ -96,9 +95,9 @@ var _ = E2EBeforeSuite(func() {
 	Expect(NewClusterSetup().
 		Install(Kuma(config_core.Global)).
 		Install(YamlUniversal(meshMTLSOn(defaultMesh, "true", "true"))).
-		Install(YamlUniversal(externalServiceInBothZones(defaultMesh))).
-		Install(YamlUniversal(externalServiceInZone2(defaultMesh, "externalservice-http-server.externalservice-namespace", 10080))).
-		Install(YamlUniversal(externalServiceInZone1(defaultMesh, "es-test-server-zone-1.default.svc.cluster.local", 80))).
+		Install(YamlUniversal(externalServiceInBothZones(defaultMesh, "external-service-in-both-zones.default.svc.cluster.local", 80))).
+		Install(YamlUniversal(externalServiceInZone2(defaultMesh, "external-service-in-zone2.default.svc.cluster.local", 80))).
+		Install(YamlUniversal(externalServiceInZone1(defaultMesh, "external-service-in-zone1.default.svc.cluster.local", 80))).
 		Setup(global)).To(Succeed())
 
 	E2EDeferCleanup(global.DismissCluster)
@@ -116,14 +115,14 @@ var _ = E2EBeforeSuite(func() {
 		Install(NamespaceWithSidecarInjection(TestNamespace)).
 		Install(DemoClientK8s(defaultMesh)).
 		Install(testserver.Install(
-			testserver.WithName("es-test-server-zone-1"),
+			testserver.WithName("external-service-in-zone1"),
 			testserver.WithNamespace("default"),
-			testserver.WithArgs("echo", "--instance", "es-test-server-zone-1"),
+			testserver.WithArgs("echo", "--instance", "external-service-in-zone1"),
 		)).
 		Install(testserver.Install(
-			testserver.WithName("es-test-server"),
+			testserver.WithName("external-service-in-both-zones"),
 			testserver.WithNamespace("default"),
-			testserver.WithArgs("echo", "--instance", "es-test-server"),
+			testserver.WithArgs("echo", "--instance", "external-service-in-both-zones"),
 		)).
 		Setup(zone1)).To(Succeed())
 
@@ -143,11 +142,10 @@ var _ = E2EBeforeSuite(func() {
 		)).
 		Install(NamespaceWithSidecarInjection(TestNamespace)).
 		Install(DemoClientK8s(defaultMesh)).
-		Install(externalservice.Install(externalservice.HttpServer, []string{})).
 		Install(testserver.Install(
-			testserver.WithName("es-test-server"),
+			testserver.WithName("external-service-in-zone2"),
 			testserver.WithNamespace("default"),
-			testserver.WithArgs("echo", "--instance", "es-test-server"),
+			testserver.WithArgs("echo", "--instance", "external-service-in-zone2"),
 		)).
 		Setup(zone2)).To(Succeed())
 
@@ -160,9 +158,9 @@ var _ = E2EBeforeSuite(func() {
 	E2EDeferCleanup(zone2.DismissCluster)
 })
 
-func ExternalServicesOnMultizoneWithLocalityAwareLb() {
+func ExternalServicesOnMultizoneK8sWithLocalityAwareLb() {
 
-	FIt("should route to external-service through other zone", func() {
+	It("should route to external-service through other zone", func() {
 		filterEgress := fmt.Sprintf(
 			"cluster.%s_%s.upstream_rq_total",
 			defaultMesh,
@@ -217,16 +215,15 @@ func ExternalServicesOnMultizoneWithLocalityAwareLb() {
 		}, "15s", "1s").Should(Succeed())
 
 		Eventually(func(g Gomega) {
-			stat, err := zone2.GetZoneEgressEnvoyTunnel().GetStats(filterEgress)
-			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(stat).To(stats.BeGreaterThanZero())
-		}, "15s", "1s").Should(Succeed())
-
-		Eventually(func(g Gomega) {
 			stat, err := zone2.GetZoneIngressEnvoyTunnel().GetStats(filterIngress)
 			g.Expect(err).ToNot(HaveOccurred())
 			g.Expect(stat).To(stats.BeGreaterThanZero())
 		}, "15s", "1s").Should(Succeed())
 
+		Eventually(func(g Gomega) {
+			stat, err := zone2.GetZoneEgressEnvoyTunnel().GetStats(filterEgress)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(stat).To(stats.BeGreaterThanZero())
+		}, "15s", "1s").Should(Succeed())
 	})
 }

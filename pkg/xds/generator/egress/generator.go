@@ -124,6 +124,10 @@ func buildDestinations(
 	return destinations
 }
 
+func zoneExternalServiceEnabled(mesh *core_xds.MeshResources) bool {
+	return mesh.Mesh.Spec.GetRouting().GetLocalityAwareLoadBalancing() && mesh.Mesh.Spec.GetRouting().GetZoneEgress()
+}
+
 func isSpecificZoneExternalService(endpoint *core_xds.Endpoint, zone string) bool {
 	return endpoint.Tags[mesh_proto.ZoneTag] == zone
 }
@@ -138,8 +142,4 @@ func isNotSpecificZoneExternalService(endpoint *core_xds.Endpoint, zone string) 
 
 func isZoneExternalService(endpoint *core_xds.Endpoint) bool {
 	return endpoint.IsExternalService() || endpoint.Tags[mesh_proto.ZoneExternalServiceTag] == "true"
-}
-
-func isNotExternalService(endpoint *core_xds.Endpoint) bool {
-	return !endpoint.IsExternalService() && endpoint.Tags[mesh_proto.ZoneExternalServiceTag] != "true"
 }

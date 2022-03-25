@@ -32,10 +32,12 @@ type IngressProxyBuilder struct {
 func (p *IngressProxyBuilder) build(key core_model.ResourceKey) (*xds.Proxy, error) {
 	ctx := context.Background()
 
-	zoneIngress, err := p.getZoneIngress(key)
+	zoneIngress, err := p.getZoneIngress(ctx, key)
 	if err != nil {
 		return nil, err
 	}
+	zoneIngress.Spec.Zone = p.zone
+
 	zoneIngress, err = xds_topology.ResolveZoneIngressPublicAddress(p.LookupIP, zoneIngress)
 	if err != nil {
 		return nil, err
@@ -93,9 +95,7 @@ func (p *IngressProxyBuilder) buildZoneIngressProxy(ctx context.Context) (*xds.Z
 	}, nil
 }
 
-func (p *IngressProxyBuilder) getZoneIngress(key core_model.ResourceKey) (*core_mesh.ZoneIngressResource, error) {
-	ctx := context.Background()
-
+func (p *IngressProxyBuilder) getZoneIngress(ctx context.Context, key core_model.ResourceKey) (*core_mesh.ZoneIngressResource, error) {
 	zoneIngress := core_mesh.NewZoneIngressResource()
 	if err := p.ReadOnlyResManager.Get(ctx, zoneIngress, core_store.GetBy(key)); err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ func (p *IngressProxyBuilder) getZoneIngress(key core_model.ResourceKey) (*core_
 	// Update Ingress' Available Services
 	// This was placed as an operation of DataplaneWatchdog out of the convenience.
 	// Consider moving to the outside of this component (follow the pattern of updating VIP outbounds)
-	if err := p.updateIngress(zoneIngress); err != nil {
+	if err := p.updateIngress(ctx, zoneIngress); err != nil {
 		return nil, err
 	}
 	return zoneIngress, nil
@@ -124,9 +124,7 @@ func (p *IngressProxyBuilder) resolveRouting(
 	return routing
 }
 
-func (p *IngressProxyBuilder) updateIngress(zoneIngress *core_mesh.ZoneIngressResource) error {
-	ctx := context.Background()
-
+func (p *IngressProxyBuilder) updateIngress(ctx context.Context, zoneIngress *core_mesh.ZoneIngressResource) error {
 	allMeshDataplanes := &core_mesh.DataplaneResourceList{}
 	if err := p.ReadOnlyResManager.List(ctx, allMeshDataplanes); err != nil {
 		return err
@@ -151,11 +149,13 @@ func (p *IngressProxyBuilder) getIngressExternalServices(ctx context.Context) (*
 	}
 
 	var meshes []*core_mesh.MeshResource
+
 	for _, mesh := range meshList.Items {
-		if mesh.ZoneEgressEnabled() {
+		if mesh.ZoneEgressEnabled() && mesh.LocalityAwareLbEnabled() {
 			meshes = append(meshes, mesh)
 		}
 	}
+
 	allMeshExternalServices := &core_mesh.ExternalServiceResourceList{}
 	var externalServices []*core_mesh.ExternalServiceResource
 	for _, mesh := range meshes {
@@ -170,7 +170,7 @@ func (p *IngressProxyBuilder) getIngressExternalServices(ctx context.Context) (*
 
 		// look for external services that are only available in my zone and expose them
 		for _, es := range meshExternalServices {
-			if es.Spec.Tags[mesh_proto.ZoneTag] != "" && es.Spec.Tags[mesh_proto.ZoneTag] == p.zone {
+			if es.Spec.Tags[mesh_proto.ZoneTag] == p.zone {
 				es.Spec.Tags[mesh_proto.ZoneExternalServiceTag] = "true"
 				externalServices = append(externalServices, es)
 			}
@@ -187,18 +187,20 @@ func (p *IngressProxyBuilder) getIngressExternalServices(ctx context.Context) (*
 }
 
 func (p *IngressProxyBuilder) getLocalZoneEgress(ctx context.Context) (*core_mesh.ZoneEgressResource, error) {
+	// resource manager has in database only local zone egress so we don't have to compare
+	// zone name. The problem is for Universal where field is empty
 	var zoneEgressesList core_mesh.ZoneEgressResourceList
 	if err := p.ReadOnlyResManager.List(ctx, &zoneEgressesList); err != nil {
 		return nil, err
 	}
 
-	// We need local zone egress location
+	// we take first instance
 	var zoneEgress *core_mesh.ZoneEgressResource
 	for _, ze := range zoneEgressesList.Items {
-		if ze.IsLocalEgress(p.zone) {
-			zoneEgress = ze
-			break
-		}
+		zoneEgress = ze
+		break
+
 	}
+
 	return zoneEgress, nil
 }

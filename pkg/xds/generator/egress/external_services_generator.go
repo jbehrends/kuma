@@ -27,7 +27,7 @@ func (g *ExternalServicesGenerator) Generate(
 	apiVersion := proxy.APIVersion
 	endpointMap := meshResources.EndpointMap
 	destinations := buildDestinations(meshResources.TrafficRoutes)
-	services := g.buildServices(endpointMap, zone)
+	services := g.buildServices(endpointMap, zone, meshResources)
 
 	g.addFilterChains(
 		apiVersion,
@@ -109,19 +109,18 @@ func (*ExternalServicesGenerator) generateCDS(
 func (*ExternalServicesGenerator) buildServices(
 	endpointMap core_xds.EndpointMap,
 	zone string,
+	meshResources *core_xds.MeshResources,
 ) []string {
 	var services []string
 
 	for serviceName, endpoints := range endpointMap {
-		if len(endpoints) > 0 && endpoints[0].IsExternalService() {
-			if isSpecificZoneOrAllZonesExternalService(&endpoints[0], zone) {
-				services = append(services, serviceName)
-			}
+		if len(endpoints) > 0 && endpoints[0].IsExternalService() &&
+			(!zoneExternalServiceEnabled(meshResources) || isSpecificZoneOrAllZonesExternalService(&endpoints[0], zone)) {
+			services = append(services, serviceName)
 		}
 	}
 
 	sort.Strings(services)
-
 	return services
 }
 
@@ -149,9 +148,10 @@ func (*ExternalServicesGenerator) addFilterChains(
 			continue
 		}
 
-		if isNotSpecificZoneExternalService(&endpoints[0], zone) {
+		if zoneExternalServiceEnabled(meshResources) &&
+			isNotSpecificZoneExternalService(&endpoints[0], zone) {
 			// we dont generate zone external service here because
-			// it should be accessed through zone egress of zone were it belongs
+			// it should be accessed through zone ingress of zone were it belongs
 			continue
 		}
 

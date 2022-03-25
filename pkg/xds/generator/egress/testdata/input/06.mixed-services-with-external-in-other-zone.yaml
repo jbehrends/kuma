@@ -5,6 +5,9 @@ mtls:
   backends:
   - name: ca-1
     type: builtin
+routing:
+  localityAwareLoadBalancing: true
+  zoneEgress: true
 ---
 type: ZoneEgress
 name: zoneegress-1

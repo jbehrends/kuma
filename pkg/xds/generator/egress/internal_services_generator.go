@@ -27,7 +27,7 @@ func (g *InternalServicesGenerator) Generate(
 	apiVersion := proxy.APIVersion
 	endpointMap := meshResources.EndpointMap
 	destinations := buildDestinations(meshResources.TrafficRoutes)
-	services := g.buildServices(endpointMap)
+	services := g.buildServices(endpointMap, meshResources)
 	meshName := meshResources.Mesh.GetMeta().GetName()
 
 	g.addFilterChains(
@@ -125,11 +125,14 @@ func (*InternalServicesGenerator) generateCDS(
 
 func (*InternalServicesGenerator) buildServices(
 	endpointMap core_xds.EndpointMap,
+	meshResources *core_xds.MeshResources,
 ) []string {
 	var services []string
 
 	for serviceName, endpoints := range endpointMap {
-		if len(endpoints) > 0 && isNotExternalService(&endpoints[0]) {
+		if len(endpoints) > 0 &&
+			!endpoints[0].IsExternalService() &&
+			(!zoneExternalServiceEnabled(meshResources) || !isZoneExternalService(&endpoints[0])) {
 			services = append(services, serviceName)
 		}
 	}
@@ -166,7 +169,8 @@ func (*InternalServicesGenerator) addFilterChains(
 				continue
 			}
 
-			if isZoneExternalService(&endpoints[0]) {
+			if zoneExternalServiceEnabled(meshResources) &&
+				isZoneExternalService(&endpoints[0]) {
 				// This generator is for internal services only
 				continue
 			}

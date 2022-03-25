@@ -23,11 +23,15 @@ func (g *ZoneExternalServicesGenerator) Generate(
 	meshResources *core_xds.MeshResources,
 ) (*core_xds.ResourceSet, error) {
 	resources := core_xds.NewResourceSet()
+	if !zoneExternalServiceEnabled(meshResources) {
+		return resources, nil
+	}
 
+	zone := proxy.ZoneEgressProxy.ZoneEgressResource.Spec.GetZone()
 	apiVersion := proxy.APIVersion
 	endpointMap := meshResources.EndpointMap
 	destinations := buildDestinations(meshResources.TrafficRoutes)
-	services := g.buildServices(endpointMap, proxy.ZoneEgressProxy.ZoneEgressResource.Spec.GetZone())
+	services := g.buildServices(endpointMap, zone)
 	meshName := meshResources.Mesh.GetMeta().GetName()
 
 	g.addFilterChains(
@@ -129,9 +133,7 @@ func (*ZoneExternalServicesGenerator) buildServices(
 	var services []string
 
 	for serviceName, endpoints := range endpointMap {
-		if len(endpoints) > 0 &&
-			isZoneExternalService(&endpoints[0]) &&
-			isNotSpecificZoneExternalService(&endpoints[0], zone) {
+		if len(endpoints) > 0 && isZoneExternalService(&endpoints[0]) && isNotSpecificZoneExternalService(&endpoints[0], zone) {
 			services = append(services, serviceName)
 		}
 	}
@@ -168,7 +170,7 @@ func (*ZoneExternalServicesGenerator) addFilterChains(
 				continue
 			}
 
-			if isNotExternalService(&endpoints[0]) {
+			if !isZoneExternalService(&endpoints[0]) {
 				// We need to generate filter chain for external services only
 				continue
 			}

@@ -18,4 +18,3 @@ var _ = Describe("Test ExternalServices on Kubernetes", externalservices.Externa
 var _ = Describe("Test ExternalServices on Kubernetes without Egress", externalservices.ExternalServicesOnKubernetesWithoutEgress)
 var _ = Describe("Test ExternalServices on Multizone Universal", externalservices.ExternalServicesOnMultizoneUniversal)
 var _ = Describe("Test ExternalServices on Universal", externalservices.ExternalServicesOnUniversal)
-var _ = Describe("Test ExternalServices on Multizone K8s with LocalityAwareLb", externalservices.ExternalServicesOnMultizoneWithLocalityAwareLb)

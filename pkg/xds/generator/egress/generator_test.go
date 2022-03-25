@@ -181,9 +181,9 @@ var _ = Describe("EgressGenerator", func() {
 			fileWithResourcesName: "05.mixed-services-with-custom-trafficpermissions.yaml",
 			expected:              "05.mixed-services-with-custom-trafficpermissions.golden.yaml",
 		}),
-		Entry("06. default trafficroute, mixed internal and external services, ", testCase{
-			fileWithResourcesName: "06.mixed-services-with-egress-ingress.yaml",
-			expected:              "06.mixed-services-with-egress-ingress2.golden.yaml",
+		Entry("06. mixed-services-with-external-in-other-zone", testCase{
+			fileWithResourcesName: "06.mixed-services-with-external-in-other-zone.yaml",
+			expected:              "06.mixed-services-with-external-in-other-zone.golden.yaml",
 		}),
 	)
 })

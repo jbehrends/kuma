@@ -1036,7 +1036,7 @@ var _ = Describe("TrafficRoute", func() {
 						},
 					},
 				},
-				mesh: defaultMeshWithMTLSAndZoneEgress,
+				mesh: defaultMeshWithMTLSAndZoneEgressAndLB,
 				expected: core_xds.EndpointMap{
 					"redis": []core_xds.Endpoint{
 						{
@@ -1052,7 +1052,7 @@ var _ = Describe("TrafficRoute", func() {
 							Port:     10002,
 							Tags:     map[string]string{mesh_proto.ServiceTag: "test", mesh_proto.ZoneTag: "zone-2"},
 							Weight:   1, // local weight is bumped to 2 to factor two instances of Ingresses
-							Locality: &core_xds.Locality{Zone: "zone-2", Priority: 0},
+							Locality: &core_xds.Locality{Zone: "zone-2", Priority: 1},
 						},
 					},
 					"example": []core_xds.Endpoint{
@@ -1071,7 +1071,7 @@ var _ = Describe("TrafficRoute", func() {
 							Tags:            map[string]string{mesh_proto.ServiceTag: "service-zone2", mesh_proto.ZoneTag: "zone-2", mesh_proto.ZoneExternalServiceTag: "true"},
 							Weight:          1, // local weight is bumped to 2 to factor two instances of Ingresses
 							ExternalService: &core_xds.ExternalService{},
-							Locality:        &core_xds.Locality{Zone: "zone-2", Priority: 0},
+							Locality:        &core_xds.Locality{Zone: "zone-2", Priority: 1},
 						},
 					},
 				},
